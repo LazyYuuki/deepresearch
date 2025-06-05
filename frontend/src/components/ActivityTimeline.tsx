@@ -38,6 +38,7 @@ export function ActivityTimeline({
     if (index === 0 && isLoading && processedEvents.length === 0) {
       return <Loader2 className="h-4 w-4 text-neutral-400 animate-spin" />;
     }
+
     if (title.toLowerCase().includes("generating")) {
       return <TextSearch className="h-4 w-4 text-neutral-400" />;
     } else if (title.toLowerCase().includes("thinking")) {
@@ -96,7 +97,7 @@ export function ActivityTimeline({
                 {processedEvents.map((eventItem, index) => (
                   <div key={index} className="relative pl-8 pb-4">
                     {index < processedEvents.length - 1 ||
-                    (isLoading && index === processedEvents.length - 1) ? (
+                      (isLoading && index === processedEvents.length - 1) ? (
                       <div className="absolute left-3 top-3.5 h-full w-0.5 bg-neutral-600" />
                     ) : null}
                     <div className="absolute left-0.5 top-2 h-6 w-6 rounded-full bg-neutral-600 flex items-center justify-center ring-4 ring-neutral-700">
@@ -110,8 +111,8 @@ export function ActivityTimeline({
                         {typeof eventItem.data === "string"
                           ? eventItem.data
                           : Array.isArray(eventItem.data)
-                          ? (eventItem.data as string[]).join(", ")
-                          : JSON.stringify(eventItem.data)}
+                            ? (eventItem.data as string[]).join(", ")
+                            : JSON.stringify(eventItem.data)}
                       </p>
                     </div>
                   </div>

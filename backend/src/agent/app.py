@@ -1,15 +1,16 @@
 # mypy: disable - error - code = "no-untyped-def,misc"
 import pathlib
+
+import fastapi.exceptions
 from fastapi import FastAPI, Request, Response
 from fastapi.staticfiles import StaticFiles
-import fastapi.exceptions
 
 # Define the FastAPI app
 app = FastAPI()
 
 
 def create_frontend_router(build_dir="../frontend/dist"):
-    """Creates a router to serve the React frontend.
+    """Create a router to serve the React frontend.
 
     Args:
         build_dir: Path to the React build directory relative to this file.

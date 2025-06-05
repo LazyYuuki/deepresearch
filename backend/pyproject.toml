@@ -2,22 +2,20 @@
 name = "agent"
 version = "0.0.1"
 description = "Backend for the LangGraph agent"
-authors = [
-    { name = "Philipp Schmid", email = "schmidphilipp1995@gmail.com" },
-]
+authors = [{ name = "Philipp Schmid", email = "schmidphilipp1995@gmail.com" }]
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11,<4.0"
 dependencies = [
-    "langgraph>=0.2.6",
-    "langchain>=0.3.19",
-    "langchain-google-genai",
-    "python-dotenv>=1.0.1",
-    "langgraph-sdk>=0.1.57",
-    "langgraph-cli",
-    "langgraph-api",
-    "fastapi",
-    "google-genai",
+  "langgraph>=0.2.6",
+  "langchain>=0.3.19",
+  "langchain-google-genai",
+  "python-dotenv>=1.0.1",
+  "langgraph-sdk>=0.1.57",
+  "langgraph-cli",
+  "langgraph-api",
+  "fastapi",
+  "google-genai",
 ]
 
 
@@ -30,22 +28,25 @@ build-backend = "setuptools.build_meta"
 
 [tool.ruff]
 lint.select = [
-    "E",    # pycodestyle
-    "F",    # pyflakes
-    "I",    # isort
-    "D",    # pydocstyle
-    "D401", # First line should be in imperative mood
-    "T201",
-    "UP",
+  "E",    # pycodestyle
+  "F",    # pyflakes
+  "I",    # isort
+  "D",    # pydocstyle
+  "D401", # First line should be in imperative mood
+  "T201",
+  "UP",
 ]
 lint.ignore = [
-    "UP006",
-    "UP007",
-    # We actually do want to import from typing_extensions
-    "UP035",
-    # Relax the convention by _not_ requiring documentation for every function parameter.
-    "D417",
-    "E501",
+  "UP006",
+  "UP007",
+  # We actually do want to import from typing_extensions
+  "UP035",
+  # Relax the convention by _not_ requiring documentation for every function parameter.
+  "D417",
+  "D101",
+  "D100",
+  "D103",
+  "E501",
 ]
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["D", "UP"]
@@ -53,7 +54,4 @@ lint.ignore = [
 convention = "google"
 
 [dependency-groups]
-dev = [
-    "langgraph-cli[inmem]>=0.1.71",
-    "pytest>=8.3.5",
-]
+dev = ["langgraph-cli[inmem]>=0.1.71", "pytest>=8.3.5"]

@@ -1,43 +1,43 @@
 import os
+from typing import Any, Dict, List
 
-from agent.tools_and_schemas import SearchQueryList, Reflection
 from dotenv import load_dotenv
+from langchain_community.utilities import GoogleSerperAPIWrapper
 from langchain_core.messages import AIMessage
-from langgraph.types import Send
-from langgraph.graph import StateGraph
-from langgraph.graph import START, END
 from langchain_core.runnables import RunnableConfig
-from google.genai import Client
+from langchain_openai import ChatOpenAI
+from langgraph.graph import END, START, StateGraph
+from langgraph.types import Send
+from openai import OpenAI
 
+from agent.configuration import Configuration
+from agent.prompts import (
+    answer_instructions,
+    get_current_date,
+    query_writer_instructions,
+    reflection_instructions,
+    web_searcher_instructions,
+)
 from agent.state import (
     OverallState,
     QueryGenerationState,
     ReflectionState,
     WebSearchState,
 )
-from agent.configuration import Configuration
-from agent.prompts import (
-    get_current_date,
-    query_writer_instructions,
-    web_searcher_instructions,
-    reflection_instructions,
-    answer_instructions,
-)
-from langchain_google_genai import ChatGoogleGenerativeAI
+from agent.tools_and_schemas import Reflection, SearchQueryList
 from agent.utils import (
-    get_citations,
     get_research_topic,
     insert_citation_markers,
-    resolve_urls,
 )
 
 load_dotenv()
 
-if os.getenv("GEMINI_API_KEY") is None:
-    raise ValueError("GEMINI_API_KEY is not set")
+if os.getenv("OPENAI_API_KEY") is None:
+    raise ValueError("API_KEY is not set")
 
-# Used for Google Search API
-genai_client = Client(api_key=os.getenv("GEMINI_API_KEY"))
+genai_client = OpenAI(
+    api_key=os.environ.get("OPENAI_API_KEY"),  # This is the default and can be omitted
+)
 
 
 # Nodes
@@ -60,12 +60,12 @@ def generate_query(state: OverallState, config: RunnableConfig) -> QueryGenerati
     if state.get("initial_search_query_count") is None:
         state["initial_search_query_count"] = configurable.number_of_initial_queries
 
-    # init Gemini 2.0 Flash
-    llm = ChatGoogleGenerativeAI(
+    llm = ChatOpenAI(
         model=configurable.query_generator_model,
         temperature=1.0,
         max_retries=2,
-        api_key=os.getenv("GEMINI_API_KEY"),
+        api_key=os.getenv("OPENAI_API_KEY"),
+        base_url="http://10.200.108.157:8080/v1",
     )
     structured_llm = llm.with_structured_output(SearchQueryList)
 
@@ -93,47 +93,129 @@ def continue_to_web_research(state: QueryGenerationState):
 
 
 def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
-    """LangGraph node that performs web research using the native Google Search API tool.
+    """LangGraph node that performs web research using OpenAI and Serper API.
 
-    Executes a web search using the native Google Search API tool in combination with Gemini 2.0 Flash.
+    Executes a web search using LangChain's Serper integration and processes results with OpenAI.
 
     Args:
         state: Current graph state containing the search query and research loop count
-        config: Configuration for the runnable, including search API settings
+        config: Configuration for the runnable, including API settings
 
     Returns:
         Dictionary with state update, including sources_gathered, research_loop_count, and web_research_results
     """
     # Configure
     configurable = Configuration.from_runnable_config(config)
+
+    # Initialize LLM using your existing pattern
+    llm = ChatOpenAI(
+        model=configurable.query_generator_model,
+        temperature=1.0,
+        max_retries=2,
+        api_key=os.getenv("OPENAI_API_KEY"),
+        base_url="http://10.200.108.157:8080/v1",
+    )
+
+    search = GoogleSerperAPIWrapper(
+        serper_api_key=os.getenv("SERPER_API_KEY"),
+        k=5,  # Number of results
+    )
+
     formatted_prompt = web_searcher_instructions.format(
         current_date=get_current_date(),
         research_topic=state["search_query"],
     )
 
-    # Uses the google genai client as the langchain client doesn't return grounding metadata
-    response = genai_client.models.generate_content(
-        model=configurable.query_generator_model,
-        contents=formatted_prompt,
-        config={
-            "tools": [{"google_search": {}}],
-            "temperature": 0,
-        },
+    # Perform search and get structured results
+    search_results = search.results(state["search_query"])
+
+    # Format search context for LLM
+    search_context = format_search_results(search_results)
+
+    # Generate analysis using OpenAI
+    response = llm.invoke(
+        [
+            {"role": "system", "content": formatted_prompt},
+            {
+                "role": "user",
+                "content": f"Based on the following search results, provide a comprehensive analysis:\n\n{search_context}",
+            },
+        ]
     )
-    # resolve the urls to short urls for saving tokens and time
-    resolved_urls = resolve_urls(
-        response.candidates[0].grounding_metadata.grounding_chunks, state["id"]
-    )
-    # Gets the citations and adds them to the generated text
-    citations = get_citations(response, resolved_urls)
-    modified_text = insert_citation_markers(response.text, citations)
-    sources_gathered = [item for citation in citations for item in citation["segments"]]
+
+    # Extract sources and create citations
+    sources_gathered = extract_sources_from_results(search_results)
+    citations = create_citations(sources_gathered)
+    modified_text = insert_citation_markers(response.content, citations)
 
     return {
         "sources_gathered": sources_gathered,
         "search_query": [state["search_query"]],
         "web_research_result": [modified_text],
     }
+
+
+def format_search_results(search_results: Dict[str, Any]) -> str:
+    """Format Serper search results into readable context for the LLM."""
+    formatted_parts = []
+
+    # Add knowledge graph if available
+    if "knowledgeGraph" in search_results:
+        kg = search_results["knowledgeGraph"]
+        formatted_parts.append(
+            f"Knowledge Graph:\n{kg.get('title', '')} - {kg.get('description', '')}\n"
+        )
+
+    # Add organic results
+    for i, result in enumerate(search_results.get("organic", []), 1):
+        formatted_parts.append(
+            f"[{i}] {result.get('title', '')}\n"
+            f"URL: {result.get('link', '')}\n"
+            f"Summary: {result.get('snippet', '')}\n"
+        )
+
+    return "\n".join(formatted_parts)
+
+
+def extract_sources_from_results(
+    search_results: Dict[str, Any],
+) -> List[Dict[str, str]]:
+    """Extract source information from Serper search results."""
+    sources = []
+
+    for result in search_results.get("organic", []):
+        sources.append(
+            {
+                "title": result.get("title", ""),
+                "short_url": result.get("link", ""),
+                "url": result.get("link", ""),
+                "snippet": result.get("snippet", ""),
+                "position": result.get("position", 0),
+            }
+        )
+
+    return sources
+
+
+def create_citations(sources: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+    """Create citation objects from sources."""
+    return [
+        {
+            "citation_id": i,
+            "title": source["title"],
+            "url": source["url"],
+            "segments": [source],
+        }
+        for i, source in enumerate(sources, 1)
+    ]
+
+
+def insert_citation_markers(text: str, citations: List[Dict[str, Any]]) -> str:
+    """Insert citation markers into the generated text."""
+    citation_text = "\n\nSources:\n" + "\n".join(
+        f"[{c['citation_id']}] {c['title']} - {c['url']}" for c in citations
+    )
+    return text + citation_text
 
 
 def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
@@ -153,7 +235,6 @@ def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
     configurable = Configuration.from_runnable_config(config)
     # Increment the research loop count and get the reasoning model
     state["research_loop_count"] = state.get("research_loop_count", 0) + 1
-    reasoning_model = state.get("reasoning_model") or configurable.reasoning_model
 
     # Format the prompt
     current_date = get_current_date()
@@ -163,11 +244,12 @@ def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
         summaries="\n\n---\n\n".join(state["web_research_result"]),
     )
     # init Reasoning Model
-    llm = ChatGoogleGenerativeAI(
-        model=reasoning_model,
+    llm = ChatOpenAI(
+        model=configurable.reflection_model,
         temperature=1.0,
         max_retries=2,
-        api_key=os.getenv("GEMINI_API_KEY"),
+        api_key=os.getenv("OPENAI_API_KEY"),
+        base_url="http://10.200.108.157:8080/v1",
     )
     result = llm.with_structured_output(Reflection).invoke(formatted_prompt)
 
@@ -231,7 +313,6 @@ def finalize_answer(state: OverallState, config: RunnableConfig):
         Dictionary with state update, including running_summary key containing the formatted final summary with sources
     """
     configurable = Configuration.from_runnable_config(config)
-    reasoning_model = state.get("reasoning_model") or configurable.reasoning_model
 
     # Format the prompt
     current_date = get_current_date()
@@ -241,12 +322,12 @@ def finalize_answer(state: OverallState, config: RunnableConfig):
         summaries="\n---\n\n".join(state["web_research_result"]),
     )
 
-    # init Reasoning Model, default to Gemini 2.5 Flash
-    llm = ChatGoogleGenerativeAI(
-        model=reasoning_model,
-        temperature=0,
+    llm = ChatOpenAI(
+        model=configurable.answer_model,
+        temperature=1.0,
         max_retries=2,
-        api_key=os.getenv("GEMINI_API_KEY"),
+        api_key=os.getenv("OPENAI_API_KEY"),
+        base_url="http://10.200.108.157:8080/v1",
     )
     result = llm.invoke(formatted_prompt)
 
@@ -254,9 +335,7 @@ def finalize_answer(state: OverallState, config: RunnableConfig):
     unique_sources = []
     for source in state["sources_gathered"]:
         if source["short_url"] in result.content:
-            result.content = result.content.replace(
-                source["short_url"], source["value"]
-            )
+            result.content = result.content.replace(source["short_url"], source["url"])
             unique_sources.append(source)
 
     return {

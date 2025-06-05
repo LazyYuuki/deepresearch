@@ -1,0 +1,47 @@
+[
+  {
+    "content": "four",
+    "additional_kwargs": {},
+    "response_metadata": {},
+    "type": "AIMessageChunk",
+    "name": null,
+    "id": "run--00d58064-4faa-4286-89d2-86886f3d4697",
+    "example": false,
+    "tool_calls": [],
+    "invalid_tool_calls": [],
+    "usage_metadata": null,
+    "tool_call_chunks": []
+  },
+  {
+    "created_by": "system",
+    "graph_id": "agent",
+    "assistant_id": "fe096781-5601-53d2-b2f6-0d3403f7e9ca",
+    "run_attempt": 1,
+    "langgraph_version": "0.4.8",
+    "langgraph_plan": "developer",
+    "langgraph_host": "self-hosted",
+    "langgraph_api_url": "http://127.0.0.1:2024",
+    "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+    "x-request-id": "32bf6f64-8669-4cb8-a947-b64ae6c16495",
+    "langgraph_auth_user_id": "",
+    "langgraph_request_id": "32bf6f64-8669-4cb8-a947-b64ae6c16495",
+    "run_id": "1f041f48-be84-6a0a-a635-fd523ad17304",
+    "thread_id": "3eb6ba7a-466e-4d9c-b3b3-0e6a9b7e2db5",
+    "user_id": "",
+    "langgraph_step": 4,
+    "langgraph_node": "finalize_answer",
+    "langgraph_triggers": [
+      "branch:to:finalize_answer"
+    ],
+    "langgraph_path": [
+      "__pregel_pull",
+      "finalize_answer"
+    ],
+    "langgraph_checkpoint_ns": "finalize_answer:34f8d782-a8be-e085-6c2f-a9071260dfb7",
+    "checkpoint_ns": "finalize_answer:34f8d782-a8be-e085-6c2f-a9071260dfb7",
+    "ls_provider": "openai",
+    "ls_model_name": "Menlo_Deepresearch_Qwen3_14B",
+    "ls_model_type": "chat",
+    "ls_temperature": 1.0
+  }
+]
