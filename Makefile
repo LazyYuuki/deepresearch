@@ -8,11 +8,11 @@ help:
 
 dev-frontend:
 	@echo "Starting frontend development server..."
-	@cd frontend && bun run dev
+	@cd frontend && bun run dev --host 0.0.0.0
 
 dev-backend:
 	@echo "Starting backend development server..."
-	@cd backend && langgraph dev
+	@cd backend && langgraph dev --config langgraph.json --host 0.0.0.0
 
 # Run frontend and backend concurrently
 dev:

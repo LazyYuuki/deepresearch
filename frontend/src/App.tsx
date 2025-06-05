@@ -22,7 +22,7 @@ export default function App() {
     reasoning_model: string;
   }>({
     apiUrl: import.meta.env.DEV
-      ? "http://localhost:2024"
+      ? "http://10.200.108.149:2024"
       : "http://localhost:8123",
     assistantId: "agent",
     messagesKey: "messages",
